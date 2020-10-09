@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.11.14
+# v0.12.3
 
 using Markdown
 using InteractiveUtils
@@ -9,6 +9,8 @@ begin
 	using Flux
 	using Flux.Data.MNIST
 	using Flux:outdims
+	using Images
+	using Images:permuteddimsview
 end
 
 # ╔═╡ 4f0b4b60-0715-11eb-2b73-bf6a98ce8dd9
@@ -65,8 +67,13 @@ model = Chain(
 )
 
 # ╔═╡ 4dca0a00-07df-11eb-3644-3d1a74281187
-# test
-convolutional_layers(training_images[1])
+channelview(training_images[1])
+
+# ╔═╡ 68bb6d40-0a46-11eb-1335-c166c9146fa5
+reshape(channelview(training_images[1]), 28, 28, 1)
+
+# ╔═╡ 0724f4ac-0a41-11eb-3ba1-ffa3b881d7a4
+convolutional_layers(reshape(channelview(training_images[1]), 28, 28, 1))
 
 # ╔═╡ Cell order:
 # ╠═e8731000-0713-11eb-1aa5-85850514f933
@@ -75,8 +82,10 @@ convolutional_layers(training_images[1])
 # ╟─4aa58040-0715-11eb-0603-4d736f5fcf7d
 # ╟─d121c110-0715-11eb-29c0-57e56bc73dec
 # ╠═1249742e-07de-11eb-1c38-e5a1521141ff
-# ╟─487f79a2-07de-11eb-3bcb-45a30b8416f5
+# ╠═487f79a2-07de-11eb-3bcb-45a30b8416f5
 # ╟─b0c75642-07de-11eb-379d-a1692550fa02
 # ╟─daa6e350-0715-11eb-02c4-9373a60ad880
 # ╠═36cd55a0-07df-11eb-2eb8-151890ffb20b
 # ╠═4dca0a00-07df-11eb-3644-3d1a74281187
+# ╠═68bb6d40-0a46-11eb-1335-c166c9146fa5
+# ╠═0724f4ac-0a41-11eb-3ba1-ffa3b881d7a4
