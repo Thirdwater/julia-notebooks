@@ -22,6 +22,8 @@ begin
 	using Flux: onecold
 	using Flux: logitcrossentropy
 	using Statistics
+	using BSON
+	using BSON: @load
 	
 	using Base.Iterators: partition
 	
@@ -101,34 +103,43 @@ Convolutional layers expect input of dimension (width, height, channel, batch si
 "
 
 # ╔═╡ 487f79a2-07de-11eb-3bcb-45a30b8416f5
-convolutional_layers = Chain(
-	Conv((3,3), image_channel=>16, pad=(1,1), relu),
-	MaxPool((2,2)),
-	Conv((3,3), 16=>32, pad=(1,1), relu),
-	MaxPool((2,2)),
-	Conv((3,3), 32=>output_channel, pad=(1,1), relu),
-	MaxPool((2,2))
-)
+function build_convolutional_layers()
+	return Chain(
+		Conv((3,3), image_channel=>16, pad=(1,1), relu),
+		MaxPool((2,2)),
+		Conv((3,3), 16=>32, pad=(1,1), relu),
+		MaxPool((2,2)),
+		Conv((3,3), 32=>output_channel, pad=(1,1), relu),
+		MaxPool((2,2))
+	)
+end
 
 # ╔═╡ b0c75642-07de-11eb-379d-a1692550fa02
 begin
-	output_dim = outdims(convolutional_layers, image_size)
+	output_dim = outdims(build_convolutional_layers(), image_size)
 	flattened_output_size = prod(output_dim) * output_channel
 	md"Calculating number of nodes at the end of the convolutional layers:"
 end
 
 # ╔═╡ daa6e350-0715-11eb-02c4-9373a60ad880
-fully_connected_layers = Chain(
-	Dense(flattened_output_size, 10)
-)
+function build_fully_connected_layers()
+	return Chain(
+		Dense(flattened_output_size, 10)
+	)
+end
+
+# ╔═╡ 197b65e2-0b87-11eb-236d-8d7d232c8b05
+function build_model()
+	return Chain(
+		build_convolutional_layers(),
+		flatten,
+		build_fully_connected_layers(),
+		softmax
+	)
+end
 
 # ╔═╡ 36cd55a0-07df-11eb-2eb8-151890ffb20b
-model = Chain(
-	convolutional_layers,
-	flatten,
-	fully_connected_layers,
-	softmax
-)
+model = build_model()
 
 # ╔═╡ 0292b882-0af4-11eb-35bf-4397d85d3717
 md"
@@ -166,7 +177,6 @@ function preprocess_batch(images, labels, indices)
 		batch_images[:, :, :, i] = Float32.(images[indices[i]])
 	end
 	batch_labels = onehotbatch(labels[indices], 0:9)
-	#return (images=batch_images, labels=batch_labels)
 	return (batch_images, batch_labels)
 end
 
@@ -191,11 +201,9 @@ typeof(training_set)
 length(training_set)
 
 # ╔═╡ c1cc2b90-0b04-11eb-017d-ef29a86a7185
-#size(training_set[1].images)
 size(training_set[1][1])
 
 # ╔═╡ ca0d3510-0b04-11eb-24e9-236d2390f0db
-#size(training_set[1].labels)
 size(training_set[1][2])
 
 # ╔═╡ 783e5350-0b03-11eb-30b3-dd0b4340a7a8
@@ -218,11 +226,9 @@ typeof(testing_set)
 length(testing_set)
 
 # ╔═╡ 7082ff20-0b04-11eb-1d26-492330fad3fc
-#size(testing_set[1].images)
 size(testing_set[1][1])
 
 # ╔═╡ d140780e-0b04-11eb-35ff-97dd61791caa
-#size(testing_set[1].labels)
 size(testing_set[1][2])
 
 # ╔═╡ a1497520-0b05-11eb-2c08-656810b1cfc5
@@ -231,7 +237,6 @@ md"
 "
 
 # ╔═╡ 94972ed2-0b05-11eb-38b5-3d62be44f33f
-#model(training_set[1].images)
 model(training_set[1][1])
 
 # ╔═╡ 8ddc33a0-0b06-11eb-391b-b39bd91e1ed0
@@ -246,7 +251,7 @@ md"
 
 # ╔═╡ a00a6ffe-0b06-11eb-095b-5f0b6bb8ad74
 begin
-	learning_rate = 0.001
+	learning_rate = 0.0001
 	optimiser = ADAM(learning_rate)
 end
 
@@ -257,18 +262,20 @@ function logit_crossentropy_loss(data, ground_truth)
 end
 
 # ╔═╡ 8818dee2-0b07-11eb-32cf-29e2680def32
-#logit_crossentropy_loss(training_set[1].images, training_set[1].labels)
 logit_crossentropy_loss(training_set[1][1], training_set[1][2])
 
 # ╔═╡ 4a8f8b50-0b07-11eb-22d2-2fff43eea24c
-function accuracy(data, ground_truth)
-	estimation = model(data)
+function accuracy(estimator, data, ground_truth)
+	estimation = estimator(data)
 	return mean( onecold(estimation) .== onecold(ground_truth) )
 end
 
 # ╔═╡ b09bcfd2-0b07-11eb-3e06-07a3ed3d5ff5
-#accuracy(training_set[1].images, training_set[1].labels)
-accuracy(training_set[1][1], training_set[1][2])
+md"
+Expect randomly initialised model to perform at around 10%:
+
+$(accuracy(model, testing_set[1][1], testing_set[1][2]))
+"
 
 # ╔═╡ eaaafb50-0b08-11eb-1b5a-c7c7b50a6b34
 md"
@@ -297,6 +304,7 @@ function train()
 	still_training = true
 	epoch = 1
 	best_accuracy = 0
+	test_accuracy = 0
 	last_improving_epoch = 1
 	loss = (x, y) -> logit_crossentropy_loss(x, y)
 	
@@ -304,7 +312,7 @@ function train()
 		@info("  Epoch $(epoch)")
 		Flux.train!(loss, params(model), training_set, optimiser)
 		
-		test_accuracy = accuracy(testing_set[1]...)
+		test_accuracy = accuracy(model, testing_set[1]...)
 		@info("    Test Accuracy:\t$(test_accuracy)")
 		
 		if test_accuracy > best_accuracy
@@ -327,6 +335,13 @@ function train()
 		end
 	end
 	
+	bson("./mnist_conv_epoch@$(epoch)_acc$(test_accuracy).bson",
+		model=model,
+		params_Flux.params(model),
+		epochs=epoch,
+		accuracy=test_accuracy
+	)
+	
 	@info("Done!")
 end
 
@@ -339,6 +354,48 @@ $(@bind doTraining CheckBox())
 # ╔═╡ 9e854f40-0b09-11eb-3b45-3b271d803194
 if doTraining
 	train()
+end
+
+# ╔═╡ 2b2e42a0-0b85-11eb-0bde-9bcd392dad49
+md"
+Load:
+$(@bind load_model CheckBox())
+"
+
+# ╔═╡ 65de17c0-0b82-11eb-1d9f-7b21be10fa44
+if load_model
+	Core.eval(Main, :(import Flux))
+	Core.eval(Main, :(import Zygote))
+	Core.eval(Main, :(import NNlib))
+	md"See [issue with loading BSON in a module](https://github.com/FluxML/Flux.jl/issues/1322):"
+end
+
+# ╔═╡ 0a7a3540-0b81-11eb-19b7-c31035f7900d
+if load_model
+	model_dict = BSON.load("./mnist_conv.bson")
+	typeof(model_dict)
+end
+
+# ╔═╡ 50fdfa70-0b85-11eb-075d-63196ba1fe72
+if load_model
+	model2 = build_model()
+	Flux.loadparams!(model2, model_dict[:params])
+	model2(training_set[1][1])
+end
+
+# ╔═╡ 107776fe-0b86-11eb-03d8-1742126d9c4a
+if load_model
+	accuracy(model, testing_set[1][1], testing_set[1][2])
+end
+
+# ╔═╡ 7fd762f0-0b85-11eb-1372-61d1c1636e70
+if load_model
+	accuracy(model2, testing_set[1][1], testing_set[1][2])
+end
+
+# ╔═╡ 45e07300-0b87-11eb-11bd-4f31cd4ebde5
+if load_model
+	accuracy(build_model(), testing_set[1][1], testing_set[1][2])
 end
 
 # ╔═╡ Cell order:
@@ -358,9 +415,10 @@ end
 # ╠═1249742e-07de-11eb-1c38-e5a1521141ff
 # ╟─ef78bc90-0af3-11eb-3618-2703383f79eb
 # ╟─1b97c760-0af1-11eb-36b6-53aaada821fc
-# ╟─487f79a2-07de-11eb-3bcb-45a30b8416f5
+# ╠═487f79a2-07de-11eb-3bcb-45a30b8416f5
 # ╠═b0c75642-07de-11eb-379d-a1692550fa02
-# ╟─daa6e350-0715-11eb-02c4-9373a60ad880
+# ╠═daa6e350-0715-11eb-02c4-9373a60ad880
+# ╠═197b65e2-0b87-11eb-236d-8d7d232c8b05
 # ╠═36cd55a0-07df-11eb-2eb8-151890ffb20b
 # ╟─0292b882-0af4-11eb-35bf-4397d85d3717
 # ╠═99f99980-0af1-11eb-3f55-53e60616b8d6
@@ -394,3 +452,10 @@ end
 # ╠═f2222520-0b08-11eb-24f0-ff34ac9a64ad
 # ╟─57737e10-0b09-11eb-0141-739c8c5dad31
 # ╠═9e854f40-0b09-11eb-3b45-3b271d803194
+# ╟─2b2e42a0-0b85-11eb-0bde-9bcd392dad49
+# ╠═65de17c0-0b82-11eb-1d9f-7b21be10fa44
+# ╠═0a7a3540-0b81-11eb-19b7-c31035f7900d
+# ╠═50fdfa70-0b85-11eb-075d-63196ba1fe72
+# ╠═107776fe-0b86-11eb-03d8-1742126d9c4a
+# ╠═7fd762f0-0b85-11eb-1372-61d1c1636e70
+# ╠═45e07300-0b87-11eb-11bd-4f31cd4ebde5
