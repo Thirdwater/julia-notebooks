@@ -87,7 +87,7 @@ From the model zoo: [simple ConvNets on MNIST](https://github.com/FluxML/model-z
 begin
 	image_size = (28, 28)
 	image_channel = 1
-	output_channel = 32
+	output_channel = 64
 	md"Model input/output:"
 end
 
@@ -105,11 +105,11 @@ Convolutional layers expect input of dimension (width, height, channel, batch si
 # ╔═╡ 487f79a2-07de-11eb-3bcb-45a30b8416f5
 function build_convolutional_layers()
 	return Chain(
-		Conv((3,3), image_channel=>16, pad=(1,1), relu),
+		Conv((3,3), image_channel=>32, pad=(1,1), relu),
 		MaxPool((2,2)),
-		Conv((3,3), 16=>32, pad=(1,1), relu),
+		Conv((7,7), 32=>64, pad=(1,1), relu),
 		MaxPool((2,2)),
-		Conv((3,3), 32=>output_channel, pad=(1,1), relu),
+		Conv((13,13), 64=>output_channel, pad=(5,5), relu),
 		MaxPool((2,2))
 	)
 end
@@ -124,7 +124,8 @@ end
 # ╔═╡ daa6e350-0715-11eb-02c4-9373a60ad880
 function build_fully_connected_layers()
 	return Chain(
-		Dense(flattened_output_size, 10)
+		Dense(flattened_output_size, 32),
+		Dense(32, 10)
 	)
 end
 
@@ -164,7 +165,7 @@ md"
 
 # ╔═╡ c2a95f70-0af4-11eb-3d5f-19091e20b706
 begin
-	batch_size = 128
+	batch_size = 256
 	batch_indices = partition(1:length(training_images), batch_size)
 	md"Partitioning data into batches:"
 end
@@ -251,7 +252,7 @@ md"
 
 # ╔═╡ a00a6ffe-0b06-11eb-095b-5f0b6bb8ad74
 begin
-	learning_rate = 0.0001
+	learning_rate = 0.00001
 	optimiser = ADAM(learning_rate)
 end
 
@@ -274,7 +275,7 @@ end
 md"
 Expect randomly initialised model to perform at around 10%:
 
-$(accuracy(model, testing_set[1][1], testing_set[1][2]))
+$(accuracy(build_model(), testing_set[1][1], testing_set[1][2]))
 "
 
 # ╔═╡ eaaafb50-0b08-11eb-1b5a-c7c7b50a6b34
@@ -284,9 +285,9 @@ md"
 
 # ╔═╡ d97bcd80-0b0a-11eb-370c-df72b16367c0
 begin
-	max_epochs = 200
-	max_accuracy = 0.999
-	max_stalling_epochs = 25
+	max_epochs = 500
+	max_accuracy = 0.99
+	max_stalling_epochs = 30
 	md"Exit conditions:"
 end
 
@@ -302,15 +303,15 @@ function train()
 	@info("\tTarget acc:\t$(max_accuracy)")
 	
 	still_training = true
-	epoch = 1
-	best_accuracy = 0
+	epoch = 106
+	best_accuracy = 0.8877
 	test_accuracy = 0
-	last_improving_epoch = 1
+	last_improving_epoch = 106
 	loss = (x, y) -> logit_crossentropy_loss(x, y)
 	
 	while still_training
 		@info("  Epoch $(epoch)")
-		Flux.train!(loss, params(model), training_set, optimiser)
+		Flux.train!(loss, Flux.params(model), training_set, optimiser)
 		
 		test_accuracy = accuracy(model, testing_set[1]...)
 		@info("    Test Accuracy:\t$(test_accuracy)")
@@ -318,6 +319,13 @@ function train()
 		if test_accuracy > best_accuracy
 			best_accuracy = test_accuracy
 			last_improving_epoch = epoch
+			@info("    Saving model to tmp_epoch...")
+			bson("./tmp_epoch@$(epoch)_acc$(test_accuracy).bson",
+				model=model,
+				params=Flux.params(model),
+				epochs=epoch,
+				accuracy=test_accuracy
+			)
 		end
 		
 		epoch = epoch + 1
@@ -337,7 +345,7 @@ function train()
 	
 	bson("./mnist_conv_epoch@$(epoch)_acc$(test_accuracy).bson",
 		model=model,
-		params_Flux.params(model),
+		params=Flux.params(model),
 		epochs=epoch,
 		accuracy=test_accuracy
 	)
@@ -372,7 +380,7 @@ end
 
 # ╔═╡ 0a7a3540-0b81-11eb-19b7-c31035f7900d
 if load_model
-	model_dict = BSON.load("./mnist_conv.bson")
+	model_dict = BSON.load("./tmp_epoch@106_acc0.8877.bson")
 	typeof(model_dict)
 end
 
@@ -383,10 +391,23 @@ if load_model
 	model2(training_set[1][1])
 end
 
-# ╔═╡ 107776fe-0b86-11eb-03d8-1742126d9c4a
+# ╔═╡ 0bfdd280-0c46-11eb-357f-69548db27f4d
 if load_model
-	accuracy(model, testing_set[1][1], testing_set[1][2])
+	Flux.loadparams!(model, model_dict[:params])
 end
+
+# ╔═╡ 767bc900-0c46-11eb-253b-e375a05b9707
+if load_model
+	model_dict[:epochs]
+end
+
+# ╔═╡ 7c29cb90-0c46-11eb-1bd1-3731b7c47830
+if load_model
+	model_dict[:accuracy]
+end
+
+# ╔═╡ 4ed3cec0-0c46-11eb-298c-91d26e1b794c
+accuracy(model, testing_set[1][1], testing_set[1][2])
 
 # ╔═╡ 7fd762f0-0b85-11eb-1372-61d1c1636e70
 if load_model
@@ -456,6 +477,9 @@ end
 # ╠═65de17c0-0b82-11eb-1d9f-7b21be10fa44
 # ╠═0a7a3540-0b81-11eb-19b7-c31035f7900d
 # ╠═50fdfa70-0b85-11eb-075d-63196ba1fe72
-# ╠═107776fe-0b86-11eb-03d8-1742126d9c4a
+# ╠═0bfdd280-0c46-11eb-357f-69548db27f4d
+# ╠═767bc900-0c46-11eb-253b-e375a05b9707
+# ╠═7c29cb90-0c46-11eb-1bd1-3731b7c47830
+# ╠═4ed3cec0-0c46-11eb-298c-91d26e1b794c
 # ╠═7fd762f0-0b85-11eb-1372-61d1c1636e70
 # ╠═45e07300-0b87-11eb-11bd-4f31cd4ebde5
