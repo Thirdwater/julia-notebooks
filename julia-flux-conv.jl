@@ -87,7 +87,7 @@ From the model zoo: [simple ConvNets on MNIST](https://github.com/FluxML/model-z
 begin
 	image_size = (28, 28)
 	image_channel = 1
-	output_channel = 64
+	output_channel = 128
 	md"Model input/output:"
 end
 
@@ -105,11 +105,11 @@ Convolutional layers expect input of dimension (width, height, channel, batch si
 # ╔═╡ 487f79a2-07de-11eb-3bcb-45a30b8416f5
 function build_convolutional_layers()
 	return Chain(
-		Conv((3,3), image_channel=>32, pad=(1,1), relu),
+		Conv((3,3), image_channel=>16, pad=(1,1), relu),
+		Conv((3,3), 16=>32, pad=(1,1), relu),
+		Conv((3,3), 32=>64, pad=(1,1), relu),
 		MaxPool((2,2)),
-		Conv((7,7), 32=>64, pad=(1,1), relu),
-		MaxPool((2,2)),
-		Conv((13,13), 64=>output_channel, pad=(5,5), relu),
+		Conv((5,5), 64=>output_channel, pad=(2,2), relu),
 		MaxPool((2,2))
 	)
 end
@@ -120,6 +120,9 @@ begin
 	flattened_output_size = prod(output_dim) * output_channel
 	md"Calculating number of nodes at the end of the convolutional layers:"
 end
+
+# ╔═╡ 33afbe80-0d5c-11eb-2f86-fbcd9dd2b02b
+output_dim
 
 # ╔═╡ daa6e350-0715-11eb-02c4-9373a60ad880
 function build_fully_connected_layers()
@@ -165,7 +168,7 @@ md"
 
 # ╔═╡ c2a95f70-0af4-11eb-3d5f-19091e20b706
 begin
-	batch_size = 256
+	batch_size = 128
 	batch_indices = partition(1:length(training_images), batch_size)
 	md"Partitioning data into batches:"
 end
@@ -287,7 +290,7 @@ md"
 begin
 	max_epochs = 500
 	max_accuracy = 0.99
-	max_stalling_epochs = 30
+	max_stalling_epochs = 50
 	md"Exit conditions:"
 end
 
@@ -303,10 +306,10 @@ function train()
 	@info("\tTarget acc:\t$(max_accuracy)")
 	
 	still_training = true
-	epoch = 106
-	best_accuracy = 0.8877
+	epoch = 1
+	best_accuracy = 0
 	test_accuracy = 0
-	last_improving_epoch = 106
+	last_improving_epoch = 1
 	loss = (x, y) -> logit_crossentropy_loss(x, y)
 	
 	while still_training
@@ -319,8 +322,8 @@ function train()
 		if test_accuracy > best_accuracy
 			best_accuracy = test_accuracy
 			last_improving_epoch = epoch
-			@info("    Saving model to tmp_epoch...")
-			bson("./tmp_epoch@$(epoch)_acc$(test_accuracy).bson",
+			@info("    Saving to model2_epoch@$(epoch)_acc$(test_accuracy).bson")
+			bson("./model2_epoch@$(epoch)_acc$(test_accuracy).bson",
 				model=model,
 				params=Flux.params(model),
 				epochs=epoch,
@@ -343,7 +346,7 @@ function train()
 		end
 	end
 	
-	bson("./mnist_conv_epoch@$(epoch)_acc$(test_accuracy).bson",
+	bson("./model2_epoch@$(epoch)_acc$(test_accuracy).bson",
 		model=model,
 		params=Flux.params(model),
 		epochs=epoch,
@@ -438,6 +441,7 @@ end
 # ╟─1b97c760-0af1-11eb-36b6-53aaada821fc
 # ╠═487f79a2-07de-11eb-3bcb-45a30b8416f5
 # ╠═b0c75642-07de-11eb-379d-a1692550fa02
+# ╠═33afbe80-0d5c-11eb-2f86-fbcd9dd2b02b
 # ╠═daa6e350-0715-11eb-02c4-9373a60ad880
 # ╠═197b65e2-0b87-11eb-236d-8d7d232c8b05
 # ╠═36cd55a0-07df-11eb-2eb8-151890ffb20b
