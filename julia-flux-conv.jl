@@ -383,7 +383,7 @@ end
 
 # ╔═╡ 0a7a3540-0b81-11eb-19b7-c31035f7900d
 if load_model
-	model_dict = BSON.load("./model2_epoch@35_acc0.9797.bson")
+	model_dict = BSON.load("./mnist_conv_epoch56_acc0.9902.bson")
 	typeof(model_dict)
 end
 
