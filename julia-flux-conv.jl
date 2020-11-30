@@ -122,7 +122,7 @@ begin
 end
 
 # ╔═╡ 33afbe80-0d5c-11eb-2f86-fbcd9dd2b02b
-output_dim
+[output_dim, flattened_output_size]
 
 # ╔═╡ daa6e350-0715-11eb-02c4-9373a60ad880
 function build_fully_connected_layers()
@@ -383,7 +383,7 @@ end
 
 # ╔═╡ 0a7a3540-0b81-11eb-19b7-c31035f7900d
 if load_model
-	model_dict = BSON.load("./tmp_epoch@106_acc0.8877.bson")
+	model_dict = BSON.load("./model2_epoch@35_acc0.9797.bson")
 	typeof(model_dict)
 end
 
