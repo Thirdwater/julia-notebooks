@@ -21,6 +21,11 @@ md"
 ## Automatic Differentiation
 "
 
+# ╔═╡ ef8a4a30-33ef-11eb-1717-338b95c94bce
+md"
+`gradient` function takes a function and a set of arguments and returns the gradient of the input function wrt each arguments (see [docs](https://fluxml.ai/Flux.jl/stable/models/basics/#Taking-Gradients-1)).
+"
+
 # ╔═╡ f08278d0-331e-11eb-280d-cf00798786a3
 function taylor_sine(x)
 	sine = 0
@@ -91,6 +96,7 @@ end
 # ╟─4fb21b40-331e-11eb-3dd2-fdd16a08c245
 # ╠═a77091e0-331e-11eb-09fc-f947365a92b6
 # ╟─e8829700-331e-11eb-0f29-2dcab2f31f9a
+# ╟─ef8a4a30-33ef-11eb-1717-338b95c94bce
 # ╠═f08278d0-331e-11eb-280d-cf00798786a3
 # ╠═d679c780-331f-11eb-0421-d56b7f761d15
 # ╠═b08808c0-331f-11eb-1901-a1ce85ac5400
